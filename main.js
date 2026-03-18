@@ -111,6 +111,7 @@ function create() {
     // Restart functionality
     this.input.keyboard.on('keydown-R', () => {
         if (currentLevel >= 0) {
+            if (currentLevel > 0) currentLevel = 1;
             isGameOver = false;
             isPaused = false;
             this.scene.restart();
@@ -132,23 +133,24 @@ function create() {
     });
 
     // UI
-    levelText = this.add.text(20, 20, currentLevel === 0 ? 'Tutorial' : `Level: ${currentLevel}/${maxLevels}`, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0);
-    timerText = this.add.text(980, 20, '10:00', { fontSize: '24px', fill: '#fff' }).setOrigin(1, 0).setScrollFactor(0);
+    levelText = this.add.text(20, 20, currentLevel === 0 ? 'Tutorial' : `Level: ${currentLevel}/${maxLevels}`, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
+    timerText = this.add.text(980, 20, '10:00', { fontSize: '24px', fill: '#fff' }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
     if (currentLevel === 0) timerText.setVisible(false);
 
     // Ability Icons
-    this.add.text(20, 550, 'Dash:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0);
-    dashIcon = this.add.image(100, 560, 'dashIcon').setScrollFactor(0);
+    this.add.text(20, 550, 'Dash:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
+    dashIcon = this.add.image(100, 560, 'dashIcon').setScrollFactor(0).setDepth(100);
     
-    this.add.text(150, 550, 'Wing:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0);
-    wingIcon = this.add.image(220, 560, 'powerup').setScale(0.8).setScrollFactor(0).setTint(0x00ffff);
+    this.add.text(150, 550, 'Wing:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
+    wingIcon = this.add.image(220, 560, 'powerup').setScale(0.8).setScrollFactor(0).setTint(0x00ffff).setDepth(100);
 
-    skipText = this.add.text(500, 570, 'Press K to Skip Tutorial', { fontSize: '18px', fill: '#aaa' }).setOrigin(0.5).setScrollFactor(0);
+    skipText = this.add.text(500, 570, 'Press K to Skip Tutorial', { fontSize: '18px', fill: '#aaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
     
     // HUD Restart Button
-    restartBtnHUD = this.add.text(980, 50, 'RESTART (R)', { fontSize: '18px', fill: '#aaa' }).setOrigin(1, 0).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    restartBtnHUD = this.add.text(980, 50, 'RESTART (R)', { fontSize: '18px', fill: '#aaa' }).setOrigin(1, 0).setScrollFactor(0).setInteractive({ useHandCursor: true }).setDepth(100);
     restartBtnHUD.on('pointerdown', () => {
         if (currentLevel >= 0) {
+            if (currentLevel > 0) currentLevel = 1;
             isGameOver = false;
             isPaused = false;
             this.scene.restart();
@@ -398,6 +400,7 @@ function generateLevel(scene, level) {
         let lastX = 50;
         let lastY = 500;
         let lastPlatWidth = 4;
+        let lastWasHighJump = false; // Added to prevent consecutive high jumps
         platforms.create(lastX, lastY, 'platform').setScale(lastPlatWidth, 1).refreshBody();
         
         // AGGRESSIVE DIFFICULTY SCALING
@@ -413,14 +416,16 @@ function generateLevel(scene, level) {
         const maxGap = 250 + (level * 8); // Pushes the limits of Dash usage
 
         while (lastX < levelWidth - 300) {
-            // Randomly decide if this is a "Powerup Jump" (very high)
-            const isHighJump = Phaser.Math.Between(0, 10) > (8 - (level / 5));
+            // REDUCED PROBABILITY - Reduced chance for High Jumps and prevented consecutive ones
+            const isHighJump = !lastWasHighJump && Phaser.Math.Between(0, 10) > (9 - (level / 10));
             let heightChange;
             
             if (isHighJump) {
                 heightChange = Phaser.Math.Between(-powerupJumpUp, -maxJumpUp - 30);
+                lastWasHighJump = true;
             } else {
                 heightChange = Phaser.Math.Between(-maxJumpUp, maxFallDown);
+                lastWasHighJump = false;
             }
 
             let gap = Phaser.Math.Between(minGap, maxGap);
@@ -611,16 +616,16 @@ function createMobileControls(scene) {
     const dpadY = 600 - padding - size * 1.5;
 
     // Up (W)
-    const upBtn = scene.add.rectangle(dpadX, dpadY - size, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(50);
-    const upText = scene.add.text(dpadX, dpadY - size, 'W', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+    const upBtn = scene.add.rectangle(dpadX, dpadY - size, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
+    const upText = scene.add.text(dpadX, dpadY - size, 'W', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // Left (A)
-    const leftBtn = scene.add.rectangle(dpadX - size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(50);
-    const leftText = scene.add.text(dpadX - size, dpadY, '←', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+    const leftBtn = scene.add.rectangle(dpadX - size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
+    const leftText = scene.add.text(dpadX - size, dpadY, '←', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // Right (D)
-    const rightBtn = scene.add.rectangle(dpadX + size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(50);
-    const rightText = scene.add.text(dpadX + size, dpadY, '→', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+    const rightBtn = scene.add.rectangle(dpadX + size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
+    const rightText = scene.add.text(dpadX + size, dpadY, '→', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // ACTION BUTTONS (Right Side)
     const jumpX = 1000 - padding - size/2;
@@ -628,11 +633,11 @@ function createMobileControls(scene) {
     const dashX = 1000 - padding - size * 2;
     const dashY = 600 - padding - size * 2;
 
-    const jumpBtn = scene.add.circle(jumpX, jumpY, size * 0.6, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(50);
-    const jumpText = scene.add.text(jumpX, jumpY, 'JUMP', { fontSize: '20px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+    const jumpBtn = scene.add.circle(jumpX, jumpY, size * 0.6, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(100);
+    const jumpText = scene.add.text(jumpX, jumpY, 'JUMP', { fontSize: '20px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-    const dashBtn = scene.add.circle(dashX, dashY, size * 0.5, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(50);
-    const dashText = scene.add.text(dashX, dashY, '⚡', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+    const dashBtn = scene.add.circle(dashX, dashY, size * 0.5, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(100);
+    const dashText = scene.add.text(dashX, dashY, '⚡', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // Input events
     leftBtn.on('pointerdown', () => touchState.left = true);
