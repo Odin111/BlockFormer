@@ -390,7 +390,7 @@ function generateLevel(scene, level) {
         let lastX = 200;
         let lastY = 500;
         
-        // 📈 AGGRESSIVE DIFFICULTY SCALING
+        // AGGRESSIVE DIFFICULTY SCALING
         const levelWidth = 1500 + (level * 500); // Levels get significantly longer
         const trapChance = 0.35 + (level * 0.04); // More spikes
         const enemyChance = 0.25 + (level * 0.04); // More robots
@@ -443,7 +443,7 @@ function generateLevel(scene, level) {
                 platforms.create(lastX + (platWidth * 16), lastY - 200, 'platform').setScale(1, wallHeight).refreshBody();
             }
 
-            // ⚠️ HAZARDS - Avoid spikes on platforms reached by high jump powerups
+            // HAZARDS - Avoid spikes on platforms reached by high jump powerups
             if (!isHighJump && Math.random() < trapChance) {
                 const trapX = lastX + (Phaser.Math.Between(0, platWidth - 1) * 32);
                 const trap = traps.create(trapX, lastY - 24, 'trap').setOrigin(0, 0);
