@@ -1,9 +1,9 @@
 const config = {
-type: Phaser.AUTO,
+    type: Phaser.AUTO,
     parent: 'game-container',
     width: 1000,
     height: 600,
-    backgroundColor: '#111',
+    // backgroundColor is handled dynamically in updateBackground
     physics: {
         default: 'arcade',
         arcade: {
@@ -36,8 +36,11 @@ let dashIcon;
 let wingIcon;
 let tutorialTexts = [];
 let skipText;
+let restartBtnHUD;
 let menuUI = [];
 let pauseUI = [];
+let bgGraphics; // For background gradient
+let starfield; // For space levels
 let timeLeft = 600; // 10 minutes in seconds
 let timerEvent; // Added back timerEvent
 let isGameOver = false;
@@ -50,52 +53,12 @@ const dashDuration = 150;
 const dashSpeed = 600;
 
 function preload() {
-    // Simple colored blocks for assets instead of external images to ensure they load
-    const graphics = this.make.graphics();
-    
-    // Player
-    graphics.fillStyle(0x3498db, 1);
-    graphics.fillRect(0, 0, 32, 32);
-    graphics.generateTexture('player', 32, 32);
-    graphics.clear();
-    
-    // Platform
-    graphics.fillStyle(0x2ecc71, 1);
-    graphics.fillRect(0, 0, 32, 32);
-    graphics.generateTexture('platform', 32, 32);
-    graphics.clear();
-
-    // Trap (Spikes)
-    graphics.fillStyle(0xe74c3c, 1);
-    graphics.fillTriangle(0, 32, 16, 0, 32, 32);
-    graphics.generateTexture('trap', 32, 32);
-    graphics.clear();
-
-    // Enemy
-    graphics.fillStyle(0xf1c40f, 1);
-    graphics.fillCircle(16, 16, 16);
-    graphics.generateTexture('enemy', 32, 32);
-    graphics.clear();
-
-    // Door
-    graphics.fillStyle(0x9b59b6, 1);
-    graphics.fillRect(0, 0, 32, 48);
-    graphics.generateTexture('door', 32, 48);
-    graphics.clear();
-
-    // Powerup (Wing)
-    graphics.fillStyle(0x00ffff, 1);
-    graphics.fillTriangle(16, 0, 0, 32, 32, 32);
-    graphics.generateTexture('powerup', 32, 32);
-    graphics.clear();
-
-    // Dash Icon
-    graphics.fillStyle(0xffffff, 0.3);
-    graphics.fillRect(0, 0, 32, 10);
-    graphics.generateTexture('dashIcon', 32, 10);
+    // Assets are generated dynamically in refreshTextures to support dynamic outlines
 }
 
 function create() {
+    bgGraphics = this.add.graphics().setScrollFactor(0);
+    
     isGameOver = false;
     isPaused = false;
     canDash = true;
@@ -131,7 +94,17 @@ function create() {
         jump: Phaser.Input.Keyboard.KeyCodes.SPACE,
         dash: Phaser.Input.Keyboard.KeyCodes.SHIFT,
         pause: Phaser.Input.Keyboard.KeyCodes.P,
-        skip: Phaser.Input.Keyboard.KeyCodes.K
+        skip: Phaser.Input.Keyboard.KeyCodes.K,
+        restart: Phaser.Input.Keyboard.KeyCodes.R
+    });
+
+    // Restart functionality
+    this.input.keyboard.on('keydown-R', () => {
+        if (currentLevel >= 0) {
+            isGameOver = false;
+            isPaused = false;
+            this.scene.restart();
+        }
     });
 
     // Skip Tutorial functionality
@@ -162,6 +135,18 @@ function create() {
 
     skipText = this.add.text(500, 570, 'Press K to Skip Tutorial', { fontSize: '18px', fill: '#aaa' }).setOrigin(0.5).setScrollFactor(0);
     
+    // HUD Restart Button
+    restartBtnHUD = this.add.text(980, 50, 'RESTART (R)', { fontSize: '18px', fill: '#aaa' }).setOrigin(1, 0).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    restartBtnHUD.on('pointerdown', () => {
+        if (currentLevel >= 0) {
+            isGameOver = false;
+            isPaused = false;
+            this.scene.restart();
+        }
+    });
+    restartBtnHUD.on('pointerover', () => restartBtnHUD.setStyle({ fill: '#fff' }));
+    restartBtnHUD.on('pointerout', () => restartBtnHUD.setStyle({ fill: '#aaa' }));
+
     // Pause UI Setup
     createPauseMenu(this);
 
@@ -254,17 +239,23 @@ function update(time, delta) {
     }
 
     // Door check
-    if (Phaser.Math.Distance.Between(player.x, player.y, door.x, door.y) < 40) {
+    if (player && door && Phaser.Math.Distance.Between(player.x, player.y, door.x, door.y) < 40) {
         nextLevel(this);
     }
 
     // Pit check
-    if (player.y > 650) {
+    if (player && player.y > 650) {
         die(this);
     }
 }
 
 function generateLevel(scene, level) {
+    // Determine outline color based on background darkness
+    const outlineColor = (level > 10 || level === -1) ? 0xffffff : 0x000000;
+    refreshTextures(scene, outlineColor);
+
+    updateBackground(scene, level);
+
     // Clear old objects
     platforms.clear(true, true);
     traps.clear(true, true);
@@ -274,6 +265,7 @@ function generateLevel(scene, level) {
     tutorialTexts = [];
     menuUI.forEach(m => m.destroy());
     menuUI = [];
+
     // Reset player state
     canDash = true;
     hasUpwardPowerup = false;
@@ -283,12 +275,15 @@ function generateLevel(scene, level) {
     if (player) player.destroy();
 
     // Reset UI visibility
-    if (levelText) levelText.setText(level === 0 ? 'Tutorial' : `Level: ${level}/${maxLevels}`);
-    if (levelText) levelText.setVisible(level >= 0);
+    if (levelText) {
+        levelText.setText(level === 0 ? 'Tutorial' : `Level: ${level}/${maxLevels}`);
+        levelText.setVisible(level >= 0);
+    }
     if (timerText) timerText.setVisible(level > 0);
     if (skipText) skipText.setVisible(level === 0);
     if (dashIcon) dashIcon.setVisible(level >= 0);
     if (wingIcon) wingIcon.setVisible(level >= 0);
+    if (restartBtnHUD) restartBtnHUD.setVisible(level >= 0);
 
     if (level === -1) {
         // --- MAIN MENU ---
@@ -401,7 +396,6 @@ function generateLevel(scene, level) {
 
         while (lastX < levelWidth - 300) {
             // Randomly decide if this is a "Powerup Jump" (very high)
-            // Chance of a high jump increases as you progress
             const isHighJump = Phaser.Math.Between(0, 10) > (8 - (level / 5));
             let heightChange;
             
@@ -413,7 +407,6 @@ function generateLevel(scene, level) {
 
             let gap = Phaser.Math.Between(minGap, maxGap);
             
-            // Adjust gap for verticality - gets tighter as levels go up
             const gapTightness = Math.max(20, 50 - level);
             if (heightChange < -50) { 
                 gap = Phaser.Math.Between(minGap, minGap + gapTightness);
@@ -424,38 +417,34 @@ function generateLevel(scene, level) {
             lastX += gap;
             lastY = Phaser.Math.Clamp(lastY + heightChange, 100, 550);
             
-            // Platform width shrinks aggressively
             let platWidth = 4;
             if (level > 2) platWidth = Phaser.Math.Between(2, 4);
             if (level > 7) platWidth = Phaser.Math.Between(1, 3);
             if (level > 12) platWidth = Phaser.Math.Between(1, 2); 
-            if (level > 17) platWidth = 1; // Pure precision at the end
+            if (level > 17) platWidth = 1;
 
             const p = platforms.create(lastX, lastY, 'platform').setScale(platWidth, 1).refreshBody();
 
-            // Spawn Powerup if it's a high jump
             if (isHighJump) {
                 const powerup = powerups.create(lastX - (gap / 2), lastY + (Math.abs(heightChange) / 2) + 50, 'powerup');
                 powerup.body.setAllowGravity(false);
             }
 
-            // 🛡️ PARKOUR ELEMENTS - Walls become more frequent
             if (level > 3 && Phaser.Math.Between(0, 10) > (9 - (level / 4))) {
                 const wallHeight = 4 + Math.floor(level / 4);
                 platforms.create(lastX + (platWidth * 16), lastY - 200, 'platform').setScale(1, wallHeight).refreshBody();
             }
 
-            // ⚠️ HAZARDS
-            if (Math.random() < trapChance) {
+            // ⚠️ HAZARDS - Avoid spikes on platforms reached by high jump powerups
+            if (!isHighJump && Math.random() < trapChance) {
                 const trapX = lastX + (Phaser.Math.Between(0, platWidth - 1) * 32);
                 const trap = traps.create(trapX, lastY - 24, 'trap').setOrigin(0, 0);
-                trap.body.setSize(8, 8);
-                trap.body.setOffset(12, 24);
+                trap.body.setSize(32, 32);
             }
 
             if (Math.random() < enemyChance) {
                 const enemy = enemies.create(lastX, lastY - 40, 'enemy');
-                const enemySpeed = 150 + (level * 15); // Robots get faster
+                const enemySpeed = 150 + (level * 15);
                 enemy.minX = lastX - (platWidth * 16);
                 enemy.maxX = lastX + (platWidth * 16);
                 enemy.setVelocityX(Math.random() < 0.5 ? enemySpeed : -enemySpeed);
@@ -464,23 +453,16 @@ function generateLevel(scene, level) {
             }
         }
 
-        // Door at the end
         door = scene.physics.add.staticSprite(lastX + 150, lastY - 40, 'door');
-
-        // Player spawn
         player = scene.physics.add.sprite(50, 450, 'player');
         player.setCollideWorldBounds(true);
-        
-        // 📸 FIX CAMERA PANNING
         scene.cameras.main.startFollow(player, true, 0.1, 0.1);
-        scene.cameras.main.scrollX = 0; // Explicitly reset scroll to start
-        
-        // Set world bounds (extended height to allow falling, disabled bottom collision)
+        scene.cameras.main.scrollX = 0;
         scene.physics.world.setBounds(0, 0, lastX + 500, 1000, true, true, true, false);
         scene.cameras.main.setBounds(0, 0, lastX + 500, 600);
     }
 
-    // Physics interactions (Always apply these after player/platforms are created)
+    // Physics interactions
     if (player && currentLevel >= 0) {
         scene.physics.add.collider(player, platforms);
         scene.physics.add.collider(enemies, platforms);
@@ -489,14 +471,34 @@ function generateLevel(scene, level) {
         scene.physics.add.overlap(player, powerups, (p, powerup) => {
             powerup.destroy();
             hasUpwardPowerup = true;
-            player.setTint(0x00ffff); // Glow cyan to show powerup
+            player.setTint(0x00ffff);
         }, null, scene);
         
-        scene.physics.add.overlap(player, traps, (p, t) => die(scene), null, scene);
+        scene.physics.add.overlap(player, traps, (p, t) => die(scene), (p, t) => {
+            // Precise triangle hitbox check
+            // We use the world coordinates of the trap (t.x, t.y) 
+            // since origin is (0,0), these are the top-left corners.
+            // Triangle points: Bottom-Left, Top-Middle, Bottom-Right
+            const triangle = new Phaser.Geom.Triangle(
+                t.x, t.y + 32,
+                t.x + 16, t.y,
+                t.x + 32, t.y + 32
+            );
+            
+            // For the player, we use a slightly shrunken rectangle for fairer collisions
+            // but for the check we use the full bounds to see if ANY part touches the triangle.
+            const playerBounds = p.getBounds();
+            // Shrink player bounds slightly for better "feel" (2px padding)
+            playerBounds.x += 2;
+            playerBounds.y += 2;
+            playerBounds.width -= 4;
+            playerBounds.height -= 4;
+
+            return Phaser.Geom.Intersects.RectangleToTriangle(playerBounds, triangle);
+        }, scene);
+
         scene.physics.add.overlap(player, enemies, (p, e) => {
-            if (!isDashing) { // Only die if NOT dashing
-                die(scene);
-            }
+            if (!isDashing) die(scene);
         }, null, scene);
     }
 }
@@ -505,65 +507,24 @@ function die(scene, reason = "GAME OVER") {
     if (isGameOver) return;
     isGameOver = true;
     scene.physics.pause();
-    player.setTint(0xff0000);
-    player.setVelocity(0, 0); // Stop player
-    
-    // Stop dash state on death
+    if (player) {
+        player.setTint(0xff0000);
+        player.setVelocity(0, 0);
+    }
     isDashing = false;
-    player.body.allowGravity = true;
-    
     const centerX = 500;
     const centerY = 300;
-
-    // Dark overlay
-    const overlay = scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.8).setScrollFactor(0);
-
-    // Death text
-    scene.add.text(centerX, centerY - 100, reason, { 
-        fontSize: '64px', 
-        fill: '#f00', 
-        fontStyle: 'bold'
-    }).setOrigin(0.5).setScrollFactor(0);
-
-    scene.add.text(centerX, centerY - 20, 'You lost your only life.', { 
-        fontSize: '24px', 
-        fill: '#fff'
-    }).setOrigin(0.5).setScrollFactor(0);
-
-    // Restart Button
-    const restartBtn = scene.add.text(centerX, centerY + 60, 'RESTART', {
-        fontSize: '32px',
-        fill: '#0f0',
-        backgroundColor: '#222',
-        padding: { x: 20, y: 10 }
-    }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
-
-    // Menu Button
-    const menuBtn = scene.add.text(centerX, centerY + 140, 'MAIN MENU', {
-        fontSize: '32px',
-        fill: '#0ff',
-        backgroundColor: '#222',
-        padding: { x: 20, y: 10 }
-    }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.8).setScrollFactor(0);
+    scene.add.text(centerX, centerY - 100, reason, { fontSize: '64px', fill: '#f00', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0);
+    scene.add.text(centerX, centerY - 20, 'You lost your only life.', { fontSize: '24px', fill: '#fff' }).setOrigin(0.5).setScrollFactor(0);
+    const restartBtn = scene.add.text(centerX, centerY + 60, 'RESTART', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    const menuBtn = scene.add.text(centerX, centerY + 140, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
 
     restartBtn.on('pointerdown', () => {
-        if (currentLevel === 0) {
-            // Keep at Level 0 if dying in tutorial
-            isGameOver = false;
-            scene.scene.restart();
-        } else {
-            currentLevel = 1;
-            isGameOver = false;
-            scene.scene.restart();
-        }
+        if (currentLevel === 0) { isGameOver = false; scene.scene.restart(); }
+        else { currentLevel = 1; isGameOver = false; scene.scene.restart(); }
     });
-
-    menuBtn.on('pointerdown', () => {
-        currentLevel = -1;
-        isGameOver = false;
-        scene.scene.restart();
-    });
-
+    menuBtn.on('pointerdown', () => { currentLevel = -1; isGameOver = false; scene.scene.restart(); });
     restartBtn.on('pointerover', () => restartBtn.setStyle({ fill: '#fff', backgroundColor: '#0a0' }));
     restartBtn.on('pointerout', () => restartBtn.setStyle({ fill: '#0f0', backgroundColor: '#222' }));
     menuBtn.on('pointerover', () => menuBtn.setStyle({ fill: '#fff', backgroundColor: '#088' }));
@@ -578,7 +539,6 @@ function nextLevel(scene) {
     }
     currentLevel++;
     generateLevel(scene, currentLevel);
-    levelText.setText(`Level: ${currentLevel}/${maxLevels}`);
 }
 
 function togglePause(scene) {
@@ -595,53 +555,130 @@ function togglePause(scene) {
 function createPauseMenu(scene) {
     const centerX = 500;
     const centerY = 300;
-
     const overlay = scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.7).setScrollFactor(0).setVisible(false);
-    
-    const pText = scene.add.text(centerX, centerY - 100, 'PAUSED', { 
-        fontSize: '64px', 
-        fill: '#fff',
-        fontStyle: 'bold'
-    }).setOrigin(0.5).setScrollFactor(0).setVisible(false);
-
-    const resumeBtn = scene.add.text(centerX, centerY + 20, 'RESUME', {
-        fontSize: '32px',
-        fill: '#0f0',
-        backgroundColor: '#222',
-        padding: { x: 20, y: 10 }
-    }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false);
-
-    const menuBtn = scene.add.text(centerX, centerY + 100, 'MAIN MENU', {
-        fontSize: '32px',
-        fill: '#0ff',
-        backgroundColor: '#222',
-        padding: { x: 20, y: 10 }
-    }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false);
-
+    const pText = scene.add.text(centerX, centerY - 100, 'PAUSED', { fontSize: '64px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setVisible(false);
+    const resumeBtn = scene.add.text(centerX, centerY + 20, 'RESUME', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false);
+    const menuBtn = scene.add.text(centerX, centerY + 100, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false);
     resumeBtn.on('pointerdown', () => togglePause(scene));
-    menuBtn.on('pointerdown', () => {
-        isPaused = false;
-        currentLevel = -1;
-        scene.scene.restart();
-    });
-
-    // Hover effects
+    menuBtn.on('pointerdown', () => { isPaused = false; currentLevel = -1; scene.scene.restart(); });
     resumeBtn.on('pointerover', () => resumeBtn.setStyle({ fill: '#fff', backgroundColor: '#0a0' }));
     resumeBtn.on('pointerout', () => resumeBtn.setStyle({ fill: '#0f0', backgroundColor: '#222' }));
     menuBtn.on('pointerover', () => menuBtn.setStyle({ fill: '#fff', backgroundColor: '#088' }));
     menuBtn.on('pointerout', () => menuBtn.setStyle({ fill: '#0ff', backgroundColor: '#222' }));
-
     pauseUI = [overlay, pText, resumeBtn, menuBtn];
 }
 
+function refreshTextures(scene, outlineColor) {
+    const graphics = scene.make.graphics();
+    const lineThickness = 2;
+
+    // Player
+    graphics.clear();
+    graphics.fillStyle(0x3498db, 1);
+    graphics.fillRect(0, 0, 32, 32);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    graphics.strokeRect(0, 0, 32, 32);
+    graphics.generateTexture('player', 32, 32);
+    
+    // Platform
+    graphics.clear();
+    graphics.fillStyle(0x2ecc71, 1);
+    graphics.fillRect(0, 0, 32, 32);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    graphics.strokeRect(0, 0, 32, 32);
+    graphics.generateTexture('platform', 32, 32);
+
+    // Trap (Spikes)
+    graphics.clear();
+    graphics.fillStyle(0xe74c3c, 1);
+    graphics.fillTriangle(0, 32, 16, 0, 32, 32);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    graphics.strokeTriangle(0, 32, 16, 0, 32, 32);
+    graphics.generateTexture('trap', 32, 32);
+
+    // Enemy
+    graphics.clear();
+    graphics.fillStyle(0xf1c40f, 1);
+    graphics.fillCircle(16, 16, 16);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    graphics.strokeCircle(16, 16, 16);
+    graphics.generateTexture('enemy', 32, 32);
+
+    // Door
+    graphics.clear();
+    graphics.fillStyle(0x8B4513, 1); // Brown
+    graphics.fillRect(0, 0, 32, 48);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    graphics.strokeRect(0, 0, 32, 48);
+    graphics.fillStyle(0xFFD700, 1); // Gold knob
+    graphics.fillCircle(26, 24, 4);
+    graphics.generateTexture('door', 32, 48);
+
+    // Powerup (Wing)
+    graphics.clear();
+    graphics.fillStyle(0x00ffff, 1);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    // Draw a "wing" shape (two triangles/arcs)
+    // Left wing
+    graphics.beginPath();
+    graphics.moveTo(16, 16);
+    graphics.lineTo(0, 8);
+    graphics.lineTo(8, 24);
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.strokePath();
+    // Right wing
+    graphics.beginPath();
+    graphics.moveTo(16, 16);
+    graphics.lineTo(32, 8);
+    graphics.lineTo(24, 24);
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.strokePath();
+    graphics.generateTexture('powerup', 32, 32);
+
+    // Dash Icon
+    graphics.clear();
+    graphics.fillStyle(0xffffff, 0.3);
+    graphics.fillRect(0, 0, 32, 10);
+    graphics.lineStyle(lineThickness, outlineColor, 1);
+    graphics.strokeRect(0, 0, 32, 10);
+    graphics.generateTexture('dashIcon', 32, 10);
+}
+
 function updateTimerDisplay() {
+    if (!timerText) return;
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
     timerText.setText(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
-    
-    if (timeLeft < 60) {
-        timerText.setFill('#f00'); // Turn red in last minute
-    } else {
-        timerText.setFill('#fff');
+    if (timeLeft < 60) timerText.setFill('#f00');
+    else timerText.setFill('#fff');
+}
+
+function updateBackground(scene, level) {
+    if (!bgGraphics) return;
+    bgGraphics.clear();
+    if (starfield) { starfield.stop(); starfield.setVisible(false); }
+    let topColor, bottomColor;
+    if (level === -1) { topColor = 0x111111; bottomColor = 0x111111; }
+    else if (level === 0) { topColor = 0x87CEEB; bottomColor = 0xADD8E6; }
+    else if (level <= 5) { topColor = 0x87CEEB; bottomColor = 0xADD8E6; }
+    else if (level <= 10) { topColor = 0xFF7F50; bottomColor = 0x4B0082; }
+    else if (level <= 15) { topColor = 0x00008B; bottomColor = 0x000000; }
+    else {
+        topColor = 0x000000; bottomColor = 0x000000;
+        if (!starfield) {
+            const particles = scene.add.particles('player');
+            starfield = particles.createEmitter({
+                x: { min: 0, max: 1000 }, y: { min: 0, max: 600 },
+                lifespan: 2000, speed: { min: 5, max: 15 },
+                scale: { start: 0.1, end: 0 }, quantity: 1, alpha: { start: 0.5, end: 0 }
+            });
+        }
+        starfield.start(); starfield.setVisible(true);
     }
+    bgGraphics.fillGradientStyle(topColor, topColor, bottomColor, bottomColor, 1);
+    bgGraphics.fillRect(0, 0, 1000, 600);
+    scene.children.sendToBack(bgGraphics);
+    if (starfield) scene.children.sendToBack(starfield.manager);
 }
