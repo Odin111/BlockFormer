@@ -476,25 +476,15 @@ function generateLevel(scene, level) {
         
         scene.physics.add.overlap(player, traps, (p, t) => die(scene), (p, t) => {
             // Precise triangle hitbox check
-            // We use the world coordinates of the trap (t.x, t.y) 
-            // since origin is (0,0), these are the top-left corners.
-            // Triangle points: Bottom-Left, Top-Middle, Bottom-Right
+            // Points: Bottom-Left, Top-Middle, Bottom-Right
             const triangle = new Phaser.Geom.Triangle(
                 t.x, t.y + 32,
                 t.x + 16, t.y,
                 t.x + 32, t.y + 32
             );
             
-            // For the player, we use a slightly shrunken rectangle for fairer collisions
-            // but for the check we use the full bounds to see if ANY part touches the triangle.
-            const playerBounds = p.getBounds();
-            // Shrink player bounds slightly for better "feel" (2px padding)
-            playerBounds.x += 2;
-            playerBounds.y += 2;
-            playerBounds.width -= 4;
-            playerBounds.height -= 4;
-
-            return Phaser.Geom.Intersects.RectangleToTriangle(playerBounds, triangle);
+            // Use full player bounds for exact accuracy as requested
+            return Phaser.Geom.Intersects.RectangleToTriangle(p.getBounds(), triangle);
         }, scene);
 
         scene.physics.add.overlap(player, enemies, (p, e) => {
