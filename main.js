@@ -3,6 +3,10 @@ const config = {
     parent: 'game-container',
     width: 1000,
     height: 600,
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     // backgroundColor is handled dynamically in updateBackground
     physics: {
         default: 'arcade',
@@ -15,6 +19,9 @@ const config = {
         preload: preload,
         create: create,
         update: update
+    },
+    input: {
+        activePointers: 3, // Allow for multiple touch inputs
     }
 };
 
@@ -51,6 +58,7 @@ let canDash = true;
 let hasUpwardPowerup = false;
 let isDashing = false;
 let dashTime = 0;
+let wingUsedOnTouch = false;
 const dashDuration = 150;
 const dashSpeed = 600;
 
@@ -198,6 +206,7 @@ function update(time, delta) {
     if (player.body.touching.down) {
         canDash = true;
         player.clearTint();
+        wingUsedOnTouch = false;
     }
 
     // Left/Right
@@ -215,25 +224,25 @@ function update(time, delta) {
         touchState.jump = false; // Reset touch jump after use
     }
 
+    // Upward Dash (Wing)
+    if ((Phaser.Input.Keyboard.JustDown(keys.up) || (touchState.up && !wingUsedOnTouch)) && hasUpwardPowerup) {
+        hasUpwardPowerup = false;
+        isDashing = true;
+        dashTime = time;
+        player.body.allowGravity = false;
+        player.setVelocity(0, -dashSpeed);
+        if (touchState.up) wingUsedOnTouch = true;
+    }
+
     // Dash
     if ((Phaser.Input.Keyboard.JustDown(keys.dash) || touchState.dash) && canDash) {
-        // Upward Dash requires a powerup
-        if (keys.up.isDown || touchState.up) {
-            if (!hasUpwardPowerup) return; // Can't dash up without powerup
-            hasUpwardPowerup = false; // Consume powerup
-            player.clearTint();
-        }
-
         isDashing = true;
         canDash = false; // Only one use before hitting ground
         dashTime = time;
         player.body.allowGravity = false;
         
         // Determine dash direction
-        if (keys.up.isDown || touchState.up) {
-            // Upward Dash (W + Shift) - Powerup consumed above
-            player.setVelocity(0, -dashSpeed);
-        } else if (keys.left.isDown || touchState.left) {
+        if (keys.left.isDown || touchState.left) {
             player.setVelocity(-dashSpeed, 0);
         } else if (keys.right.isDown || touchState.right) {
             player.setVelocity(dashSpeed, 0);
@@ -349,22 +358,23 @@ function generateLevel(scene, level) {
         // --- TUTORIAL LEVEL ---
         const groundY = 500;
         platforms.create(0, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(50, 400, 'A/D to Move\nSPACE to Jump', { fontSize: '18px', fill: '#fff' }));
+        tutorialTexts.push(scene.add.text(50, 400, 'A/D to Move\nSPACE to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
 
         platforms.create(500, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(550, 400, 'SHIFT to Dash\n(One use in air)', { fontSize: '18px', fill: '#fff' }));
+        tutorialTexts.push(scene.add.text(550, 400, 'SHIFT to Dash\n(One use in air)', { fontSize: '18px', fill: '#fff' }).setDepth(10));
 
         platforms.create(1000, groundY, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
         const p = powerups.create(1150, 450, 'powerup');
         p.body.setAllowGravity(false);
-        tutorialTexts.push(scene.add.text(1050, 350, 'Pick up Wing\nW + SHIFT to Dash Up', { fontSize: '18px', fill: '#0ff' }));
+        p.respawnPos = { x: 1150, y: 450 };
+        tutorialTexts.push(scene.add.text(1050, 350, 'Pick up Wing\nPress W to fly up\n(Respawns in 1 sec)', { fontSize: '18px', fill: '#0ff' }).setDepth(10));
 
         platforms.create(1300, 300, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(1350, 200, 'Dashing does NOT make\nyou invincible!', { fontSize: '18px', fill: '#f88' }));
+        tutorialTexts.push(scene.add.text(1350, 200, 'Dashing does NOT make\nyou invincible!', { fontSize: '18px', fill: '#f88' }).setDepth(10));
         traps.create(1400, 276, 'trap').setOrigin(0, 0); // Spikes on platform
 
         platforms.create(1600, 300, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(1650, 200, 'Avoid Enemies!', { fontSize: '18px', fill: '#ff0' }));
+        tutorialTexts.push(scene.add.text(1650, 200, 'Avoid Enemies!', { fontSize: '18px', fill: '#ff0' }).setDepth(10));
         const enemy = enemies.create(1750, 260, 'enemy');
         enemy.minX = 1600;
         enemy.maxX = 1600 + (5 * 32);
@@ -373,7 +383,7 @@ function generateLevel(scene, level) {
         enemy.setCollideWorldBounds(false);
 
         platforms.create(1900, 300, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(1950, 200, 'Reach the door!', { fontSize: '18px', fill: '#fff' }));
+        tutorialTexts.push(scene.add.text(1950, 200, 'Reach the door!', { fontSize: '18px', fill: '#fff' }).setDepth(10));
         door = scene.physics.add.staticSprite(2050, 260, 'door');
 
         player = scene.physics.add.sprite(50, 450, 'player');
@@ -385,10 +395,10 @@ function generateLevel(scene, level) {
     } else {
         // --- NORMAL PROCEDURAL LEVELS ---
         // Start platform (safe zone)
-        platforms.create(50, 500, 'platform').setScale(4, 1).refreshBody();
-
-        let lastX = 200;
+        let lastX = 50;
         let lastY = 500;
+        let lastPlatWidth = 4;
+        platforms.create(lastX, lastY, 'platform').setScale(lastPlatWidth, 1).refreshBody();
         
         // AGGRESSIVE DIFFICULTY SCALING
         const levelWidth = 1500 + (level * 500); // Levels get significantly longer
@@ -422,39 +432,53 @@ function generateLevel(scene, level) {
                 gap = Phaser.Math.Between(minGap + gapTightness, maxGap);
             }
             
+            // Calculate new position based on gap between platform edges
+            // But we use centers for creation, so gap is distance between centers
+            const oldX = lastX;
+            const oldY = lastY;
+            const oldPlatWidth = lastPlatWidth;
+            
             lastX += gap;
             lastY = Phaser.Math.Clamp(lastY + heightChange, 100, 550);
             
-            let platWidth = 4;
-            if (level > 2) platWidth = Phaser.Math.Between(2, 4);
-            if (level > 7) platWidth = Phaser.Math.Between(1, 3);
-            if (level > 12) platWidth = Phaser.Math.Between(1, 2); 
-            if (level > 17) platWidth = 1;
+            lastPlatWidth = 4;
+            if (level > 2) lastPlatWidth = Phaser.Math.Between(2, 4);
+            if (level > 7) lastPlatWidth = Phaser.Math.Between(1, 3);
+            if (level > 12) lastPlatWidth = Phaser.Math.Between(1, 2); 
+            if (level > 17) lastPlatWidth = 1;
 
-            const p = platforms.create(lastX, lastY, 'platform').setScale(platWidth, 1).refreshBody();
+            const p = platforms.create(lastX, lastY, 'platform').setScale(lastPlatWidth, 1).refreshBody();
 
             if (isHighJump) {
-                const powerup = powerups.create(lastX - (gap / 2), lastY + (Math.abs(heightChange) / 2) + 50, 'powerup');
+                // Place wing EXACTLY in the center of the gap to avoid platform overlap/spikes
+                const prevRightEdge = oldX + (oldPlatWidth * 16);
+                const currLeftEdge = lastX - (lastPlatWidth * 16);
+                const wingX = (prevRightEdge + currLeftEdge) / 2;
+                const wingY = (oldY + lastY) / 2;
+                
+                const powerup = powerups.create(wingX, wingY, 'powerup');
                 powerup.body.setAllowGravity(false);
+                powerup.respawnPos = { x: wingX, y: wingY };
             }
 
             if (level > 3 && Phaser.Math.Between(0, 10) > (9 - (level / 4))) {
                 const wallHeight = 4 + Math.floor(level / 4);
-                platforms.create(lastX + (platWidth * 16), lastY - 200, 'platform').setScale(1, wallHeight).refreshBody();
+                platforms.create(lastX + (lastPlatWidth * 16), lastY - 200, 'platform').setScale(1, wallHeight).refreshBody();
             }
 
             // HAZARDS - Avoid spikes on platforms reached by high jump powerups
             if (!isHighJump && Math.random() < trapChance) {
-                const trapX = lastX + (Phaser.Math.Between(0, platWidth - 1) * 32);
+                const trapIdx = Phaser.Math.Between(0, lastPlatWidth - 1);
+                const trapX = lastX - (lastPlatWidth * 16) + (trapIdx * 32);
                 const trap = traps.create(trapX, lastY - 24, 'trap').setOrigin(0, 0);
                 trap.body.setSize(32, 32);
             }
 
-            if (Math.random() < enemyChance) {
+            if (lastPlatWidth > 1 && Math.random() < enemyChance) {
                 const enemy = enemies.create(lastX, lastY - 40, 'enemy');
                 const enemySpeed = 150 + (level * 15);
-                enemy.minX = lastX - (platWidth * 16);
-                enemy.maxX = lastX + (platWidth * 16);
+                enemy.minX = lastX - (lastPlatWidth * 16);
+                enemy.maxX = lastX + (lastPlatWidth * 16);
                 enemy.setVelocityX(Math.random() < 0.5 ? enemySpeed : -enemySpeed);
                 enemy.setBounce(1);
                 enemy.setCollideWorldBounds(false);
@@ -477,9 +501,17 @@ function generateLevel(scene, level) {
         scene.physics.add.collider(enemies, enemies);
         
         scene.physics.add.overlap(player, powerups, (p, powerup) => {
+            const respawnPos = powerup.respawnPos;
             powerup.destroy();
             hasUpwardPowerup = true;
             player.setTint(0x00ffff);
+            scene.time.delayedCall(1000, () => {
+                if (respawnPos) {
+                    const newPowerup = powerups.create(respawnPos.x, respawnPos.y, 'powerup');
+                    newPowerup.body.setAllowGravity(false);
+                    newPowerup.respawnPos = respawnPos; // Ensure the new one also knows where to respawn
+                }
+            });
         }, null, scene);
         
         scene.physics.add.overlap(player, traps, (p, t) => die(scene), (p, t) => {
@@ -717,7 +749,7 @@ function updateBackground(scene, level) {
     if (starfield) { starfield.stop(); starfield.setVisible(false); }
     let topColor, bottomColor;
     if (level === -1) { topColor = 0x111111; bottomColor = 0x111111; }
-    else if (level === 0) { topColor = 0x87CEEB; bottomColor = 0xADD8E6; }
+    else if (level === 0) { topColor = 0x000000; bottomColor = 0x000000; }
     else if (level <= 5) { topColor = 0x87CEEB; bottomColor = 0xADD8E6; }
     else if (level <= 10) { topColor = 0xFF7F50; bottomColor = 0x4B0082; }
     else if (level <= 15) { topColor = 0x00008B; bottomColor = 0x000000; }
