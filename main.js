@@ -39,6 +39,8 @@ let skipText;
 let restartBtnHUD;
 let menuUI = [];
 let pauseUI = [];
+let mobileControlsUI = [];
+let touchState = { left: false, right: false, up: false, jump: false, dash: false };
 let bgGraphics; // For background gradient
 let starfield; // For space levels
 let timeLeft = 600; // 10 minutes in seconds
@@ -150,6 +152,9 @@ function create() {
     // Pause UI Setup
     createPauseMenu(this);
 
+    // Mobile Controls Setup
+    createMobileControls(this);
+
     generateLevel(this, currentLevel);
     
     if (player) {
@@ -196,23 +201,24 @@ function update(time, delta) {
     }
 
     // Left/Right
-    if (keys.left.isDown) {
+    if (keys.left.isDown || touchState.left) {
         player.setVelocityX(-speed);
-    } else if (keys.right.isDown) {
+    } else if (keys.right.isDown || touchState.right) {
         player.setVelocityX(speed);
     } else {
         player.setVelocityX(0);
     }
 
     // Jump
-    if (Phaser.Input.Keyboard.JustDown(keys.jump) && player.body.touching.down) {
+    if ((Phaser.Input.Keyboard.JustDown(keys.jump) || touchState.jump) && player.body.touching.down) {
         player.setVelocityY(jumpForce);
+        touchState.jump = false; // Reset touch jump after use
     }
 
     // Dash
-    if (Phaser.Input.Keyboard.JustDown(keys.dash) && canDash) {
+    if ((Phaser.Input.Keyboard.JustDown(keys.dash) || touchState.dash) && canDash) {
         // Upward Dash requires a powerup
-        if (keys.up.isDown) {
+        if (keys.up.isDown || touchState.up) {
             if (!hasUpwardPowerup) return; // Can't dash up without powerup
             hasUpwardPowerup = false; // Consume powerup
             player.clearTint();
@@ -224,18 +230,19 @@ function update(time, delta) {
         player.body.allowGravity = false;
         
         // Determine dash direction
-        if (keys.up.isDown) {
+        if (keys.up.isDown || touchState.up) {
             // Upward Dash (W + Shift) - Powerup consumed above
             player.setVelocity(0, -dashSpeed);
-        } else if (keys.left.isDown) {
+        } else if (keys.left.isDown || touchState.left) {
             player.setVelocity(-dashSpeed, 0);
-        } else if (keys.right.isDown) {
+        } else if (keys.right.isDown || touchState.right) {
             player.setVelocity(dashSpeed, 0);
         } else {
             // Default to current horizontal facing or right
             const dirX = player.body.velocity.x >= 0 ? dashSpeed : -dashSpeed;
             player.setVelocity(dirX, 0);
         }
+        touchState.dash = false; // Reset touch dash after use
     }
 
     // Door check
@@ -284,6 +291,7 @@ function generateLevel(scene, level) {
     if (dashIcon) dashIcon.setVisible(level >= 0);
     if (wingIcon) wingIcon.setVisible(level >= 0);
     if (restartBtnHUD) restartBtnHUD.setVisible(level >= 0);
+    mobileControlsUI.forEach(btn => btn.setVisible(level >= 0));
 
     if (level === -1) {
         // --- MAIN MENU ---
@@ -545,10 +553,10 @@ function togglePause(scene) {
 function createPauseMenu(scene) {
     const centerX = 500;
     const centerY = 300;
-    const overlay = scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.7).setScrollFactor(0).setVisible(false);
-    const pText = scene.add.text(centerX, centerY - 100, 'PAUSED', { fontSize: '64px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setVisible(false);
-    const resumeBtn = scene.add.text(centerX, centerY + 20, 'RESUME', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false);
-    const menuBtn = scene.add.text(centerX, centerY + 100, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false);
+    const overlay = scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.7).setScrollFactor(0).setVisible(false).setDepth(100);
+    const pText = scene.add.text(centerX, centerY - 100, 'PAUSED', { fontSize: '64px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setVisible(false).setDepth(101);
+    const resumeBtn = scene.add.text(centerX, centerY + 20, 'RESUME', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(101);
+    const menuBtn = scene.add.text(centerX, centerY + 100, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(101);
     resumeBtn.on('pointerdown', () => togglePause(scene));
     menuBtn.on('pointerdown', () => { isPaused = false; currentLevel = -1; scene.scene.restart(); });
     resumeBtn.on('pointerover', () => resumeBtn.setStyle({ fill: '#fff', backgroundColor: '#0a0' }));
@@ -556,6 +564,64 @@ function createPauseMenu(scene) {
     menuBtn.on('pointerover', () => menuBtn.setStyle({ fill: '#fff', backgroundColor: '#088' }));
     menuBtn.on('pointerout', () => menuBtn.setStyle({ fill: '#0ff', backgroundColor: '#222' }));
     pauseUI = [overlay, pText, resumeBtn, menuBtn];
+}
+
+function createMobileControls(scene) {
+    // Show on touch devices
+    const isTouch = scene.sys.game.device.input.touch;
+    if (!isTouch) return;
+
+    const size = 70;
+    const padding = 40;
+    
+    // D-PAD (Left Side)
+    const dpadX = padding + size * 1.5;
+    const dpadY = 600 - padding - size * 1.5;
+
+    // Up (W)
+    const upBtn = scene.add.rectangle(dpadX, dpadY - size, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(50);
+    const upText = scene.add.text(dpadX, dpadY - size, 'W', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    // Left (A)
+    const leftBtn = scene.add.rectangle(dpadX - size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(50);
+    const leftText = scene.add.text(dpadX - size, dpadY, '←', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    // Right (D)
+    const rightBtn = scene.add.rectangle(dpadX + size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(50);
+    const rightText = scene.add.text(dpadX + size, dpadY, '→', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    // ACTION BUTTONS (Right Side)
+    const jumpX = 1000 - padding - size/2;
+    const jumpY = 600 - padding - size/2;
+    const dashX = 1000 - padding - size * 2;
+    const dashY = 600 - padding - size * 2;
+
+    const jumpBtn = scene.add.circle(jumpX, jumpY, size * 0.6, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(50);
+    const jumpText = scene.add.text(jumpX, jumpY, 'JUMP', { fontSize: '20px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    const dashBtn = scene.add.circle(dashX, dashY, size * 0.5, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(50);
+    const dashText = scene.add.text(dashX, dashY, '⚡', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(51);
+
+    // Input events
+    leftBtn.on('pointerdown', () => touchState.left = true);
+    leftBtn.on('pointerup', () => touchState.left = false);
+    leftBtn.on('pointerout', () => touchState.left = false);
+
+    rightBtn.on('pointerdown', () => touchState.right = true);
+    rightBtn.on('pointerup', () => touchState.right = false);
+    rightBtn.on('pointerout', () => touchState.right = false);
+
+    upBtn.on('pointerdown', () => touchState.up = true);
+    upBtn.on('pointerup', () => touchState.up = false);
+    upBtn.on('pointerout', () => touchState.up = false);
+
+    jumpBtn.on('pointerdown', () => touchState.jump = true);
+    jumpBtn.on('pointerup', () => touchState.jump = false);
+
+    dashBtn.on('pointerdown', () => touchState.dash = true);
+    dashBtn.on('pointerup', () => touchState.dash = false);
+
+    mobileControlsUI = [leftBtn, leftText, rightBtn, rightText, upBtn, upText, jumpBtn, jumpText, dashBtn, dashText];
 }
 
 function refreshTextures(scene, outlineColor) {
