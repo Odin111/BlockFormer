@@ -482,9 +482,14 @@ function generateLevel(scene, level) {
                 trap.body.setSize(32, 32);
             }
 
-            if (lastPlatWidth > 1 && Math.random() < enemyChance) {
+            if (lastPlatWidth >= 3 && Math.random() < enemyChance) {
                 const enemy = enemies.create(lastX, lastY - 40, 'enemy');
-                const enemySpeed = 150 + (level * 15);
+                
+                // Randomize speed: base (100-200) + scaling (level * 10), capped at 400
+                const baseSpeed = Phaser.Math.Between(100, 200);
+                const scalingSpeed = level * 10;
+                const enemySpeed = Math.min(baseSpeed + scalingSpeed, 400);
+                
                 enemy.minX = lastX - (lastPlatWidth * 16);
                 enemy.maxX = lastX + (lastPlatWidth * 16);
                 enemy.setVelocityX(Math.random() < 0.5 ? enemySpeed : -enemySpeed);
