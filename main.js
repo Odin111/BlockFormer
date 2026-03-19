@@ -4,8 +4,11 @@ const config = {
     width: 1000,
     height: 600,
     scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        mode: Phaser.Scale.STRETCH,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 1000,
+        height: 600,
+        expandParent: true
     },
     // backgroundColor is handled dynamically in updateBackground
     physics: {
@@ -306,8 +309,8 @@ function generateLevel(scene, level) {
 
     if (level === -1) {
         // --- MAIN MENU ---
-        const centerX = 500;
-        const centerY = 300;
+        const centerX = scene.scale.width / 2;
+        const centerY = scene.scale.height / 2;
 
         menuUI.push(scene.add.text(centerX, centerY - 150, 'BLOCKFORMER', { 
             fontSize: '80px', 
@@ -547,9 +550,9 @@ function die(scene, reason = "GAME OVER") {
         player.setVelocity(0, 0);
     }
     isDashing = false;
-    const centerX = 500;
-    const centerY = 300;
-    scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.8).setScrollFactor(0);
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+    scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0.8).setScrollFactor(0);
     scene.add.text(centerX, centerY - 100, reason, { fontSize: '64px', fill: '#f00', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0);
     scene.add.text(centerX, centerY - 20, 'You lost your only life.', { fontSize: '24px', fill: '#fff' }).setOrigin(0.5).setScrollFactor(0);
     const restartBtn = scene.add.text(centerX, centerY + 60, 'RESTART', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
@@ -588,9 +591,9 @@ function togglePause(scene) {
 }
 
 function createPauseMenu(scene) {
-    const centerX = 500;
-    const centerY = 300;
-    const overlay = scene.add.rectangle(centerX, centerY, 1000, 600, 0x000000, 0.7).setScrollFactor(0).setVisible(false).setDepth(100);
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+    const overlay = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0.7).setScrollFactor(0).setVisible(false).setDepth(100);
     const pText = scene.add.text(centerX, centerY - 100, 'PAUSED', { fontSize: '64px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setVisible(false).setDepth(101);
     const resumeBtn = scene.add.text(centerX, centerY + 20, 'RESUME', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(101);
     const menuBtn = scene.add.text(centerX, centerY + 100, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(101);
@@ -613,7 +616,7 @@ function createMobileControls(scene) {
     
     // D-PAD (Left Side)
     const dpadX = padding + size * 1.5;
-    const dpadY = 600 - padding - size * 1.5;
+    const dpadY = scene.scale.height - padding - size * 1.5;
 
     // Up (W)
     const upBtn = scene.add.rectangle(dpadX, dpadY - size, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
@@ -628,10 +631,10 @@ function createMobileControls(scene) {
     const rightText = scene.add.text(dpadX + size, dpadY, '→', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // ACTION BUTTONS (Right Side)
-    const jumpX = 1000 - padding - size/2;
-    const jumpY = 600 - padding - size/2;
-    const dashX = 1000 - padding - size * 2;
-    const dashY = 600 - padding - size * 2;
+    const jumpX = scene.scale.width - padding - size/2;
+    const jumpY = scene.scale.height - padding - size/2;
+    const dashX = scene.scale.width - padding - size * 2;
+    const dashY = scene.scale.height - padding - size * 2;
 
     const jumpBtn = scene.add.circle(jumpX, jumpY, size * 0.6, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(100);
     const jumpText = scene.add.text(jumpX, jumpY, 'JUMP', { fontSize: '20px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
@@ -763,7 +766,7 @@ function updateBackground(scene, level) {
         if (!starfield) {
             const particles = scene.add.particles('player');
             starfield = particles.createEmitter({
-                x: { min: 0, max: 1000 }, y: { min: 0, max: 600 },
+                x: { min: 0, max: scene.scale.width }, y: { min: 0, max: scene.scale.height },
                 lifespan: 2000, speed: { min: 5, max: 15 },
                 scale: { start: 0.1, end: 0 }, quantity: 1, alpha: { start: 0.5, end: 0 }
             });
@@ -771,7 +774,7 @@ function updateBackground(scene, level) {
         starfield.start(); starfield.setVisible(true);
     }
     bgGraphics.fillGradientStyle(topColor, topColor, bottomColor, bottomColor, 1);
-    bgGraphics.fillRect(0, 0, 1000, 600);
+    bgGraphics.fillRect(0, 0, scene.scale.width, scene.scale.height);
     scene.children.sendToBack(bgGraphics);
     if (starfield) scene.children.sendToBack(starfield.manager);
 }
