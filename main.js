@@ -75,6 +75,9 @@ function preload() {
 
 function create() {
     bgGraphics = this.add.graphics().setScrollFactor(0);
+
+    isMobile = /Mobi|Android|iP(ad|hone|od)/i.test(navigator.userAgent) || this.sys.game.device.input.touch;
+    console.log('isMobile', isMobile, 'touch', this.sys.game.device.input.touch);
     
     isGameOver = false;
     isPaused = false;
@@ -686,7 +689,7 @@ function createPauseMenu(scene) {
 
 function createMobileControls(scene) {
     // Show on touch devices
-    const isTouch = scene.sys.game.device.input.touch;
+    const isTouch = scene.sys.game.device.input.touch || /Mobi|Android|iP(ad|hone|od)/i.test(navigator.userAgent);
     isMobile = !!isTouch;
     if (!isTouch) return;
 
