@@ -42,6 +42,7 @@ const maxLevels = 20;
 let levelText;
 let pauseText;
 let timerText;
+let deathText;
 let dashIcon;
 let wingIcon;
 let tutorialTexts = [];
@@ -55,8 +56,10 @@ let bgGraphics; // For background gradient
 let starfield; // For space levels
 let timeLeft = 600; // 10 minutes in seconds
 let timerEvent; // Added back timerEvent
+let deathCount = 0;
 let isGameOver = false;
 let isPaused = false;
+let isTransitioning = false; // Prevent multiple level generations
 let canDash = true;
 let hasUpwardPowerup = false;
 let isDashing = false;
@@ -74,6 +77,7 @@ function create() {
     
     isGameOver = false;
     isPaused = false;
+    isTransitioning = false; // RESET THIS - Crucial to prevent freezes!
     canDash = true;
     hasUpwardPowerup = false;
     isDashing = false;
@@ -106,14 +110,15 @@ function create() {
         down: Phaser.Input.Keyboard.KeyCodes.S,
         jump: Phaser.Input.Keyboard.KeyCodes.SPACE,
         dash: Phaser.Input.Keyboard.KeyCodes.SHIFT,
-        pause: Phaser.Input.Keyboard.KeyCodes.P,
+        pause: Phaser.Input.Keyboard.KeyCodes.ESC,
         skip: Phaser.Input.Keyboard.KeyCodes.K,
         restart: Phaser.Input.Keyboard.KeyCodes.R
     });
 
     // Restart functionality
     this.input.keyboard.on('keydown-R', () => {
-        if (currentLevel >= 0) {
+        if (currentLevel >= 0 && !isTransitioning) {
+            isTransitioning = true;
             if (currentLevel > 0) currentLevel = 1;
             isGameOver = false;
             isPaused = false;
@@ -123,22 +128,33 @@ function create() {
 
     // Skip Tutorial functionality
     this.input.keyboard.on('keydown-K', () => {
-        if (currentLevel === 0) {
+        if (currentLevel === 0 && !isTransitioning) {
+            isTransitioning = true;
+            this.physics.pause();
             currentLevel = 1;
-            generateLevel(this, currentLevel);
+            isGameOver = false;
+            isPaused = false;
+            this.cameras.main.fadeOut(500, 0, 0, 0);
+            this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                this.scene.restart();
+            });
         }
     });
 
     // Pause functionality
-    this.input.keyboard.on('keydown-P', () => {
-        if (isGameOver || currentLevel === -1) return;
+    this.input.keyboard.on('keydown-ESC', () => {
+        if (isGameOver || currentLevel === -1 || isTransitioning) return;
         togglePause(this);
     });
 
     // UI
     levelText = this.add.text(20, 20, currentLevel === 0 ? 'Tutorial' : `Level: ${currentLevel}/${maxLevels}`, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
+    deathText = this.add.text(20, 50, `Deaths: ${deathCount}`, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
     timerText = this.add.text(980, 20, '10:00', { fontSize: '24px', fill: '#fff' }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
-    if (currentLevel === 0) timerText.setVisible(false);
+    if (currentLevel === 0) {
+        timerText.setVisible(false);
+        deathText.setVisible(false);
+    }
 
     // Ability Icons
     this.add.text(20, 550, 'Dash:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
@@ -152,7 +168,8 @@ function create() {
     // HUD Restart Button
     restartBtnHUD = this.add.text(980, 50, 'RESTART (R)', { fontSize: '18px', fill: '#aaa' }).setOrigin(1, 0).setScrollFactor(0).setInteractive({ useHandCursor: true }).setDepth(100);
     restartBtnHUD.on('pointerdown', () => {
-        if (currentLevel >= 0) {
+        if (currentLevel >= 0 && !isTransitioning) {
+            isTransitioning = true;
             if (currentLevel > 0) currentLevel = 1;
             isGameOver = false;
             isPaused = false;
@@ -173,10 +190,13 @@ function create() {
     if (player) {
         this.cameras.main.startFollow(player, true, 0.1, 0.1);
     }
+
+    // Level fully ready, allow new transitions
+    isTransitioning = false;
 }
 
 function update(time, delta) {
-    if (currentLevel === -1 || isGameOver || isPaused) return;
+    if (currentLevel === -1 || isGameOver || isPaused || isTransitioning) return;
 
     // UI Update for Ability Icons
     if (dashIcon) dashIcon.setAlpha(canDash ? 1 : 0.2);
@@ -260,7 +280,7 @@ function update(time, delta) {
     }
 
     // Door check
-    if (player && door && Phaser.Math.Distance.Between(player.x, player.y, door.x, door.y) < 40) {
+    if (player && door && !isTransitioning && Phaser.Math.Distance.Between(player.x, player.y, door.x, door.y) < 40) {
         nextLevel(this);
     }
 
@@ -282,6 +302,10 @@ function generateLevel(scene, level) {
     traps.clear(true, true);
     enemies.clear(true, true);
     powerups.clear(true, true);
+    if (starfield) {
+        starfield.manager.destroy();
+        starfield = null;
+    }
     tutorialTexts.forEach(t => t.destroy());
     tutorialTexts = [];
     menuUI.forEach(m => m.destroy());
@@ -300,6 +324,7 @@ function generateLevel(scene, level) {
         levelText.setText(level === 0 ? 'Tutorial' : `Level: ${level}/${maxLevels}`);
         levelText.setVisible(level >= 0);
     }
+    if (deathText) deathText.setVisible(level > 0);
     if (timerText) timerText.setVisible(level > 0);
     if (skipText) skipText.setVisible(level === 0);
     if (dashIcon) dashIcon.setVisible(level >= 0);
@@ -309,6 +334,8 @@ function generateLevel(scene, level) {
 
     if (level === -1) {
         // --- MAIN MENU ---
+        deathCount = 0;
+        updateDeathDisplay();
         const centerX = scene.scale.width / 2;
         const centerY = scene.scale.height / 2;
 
@@ -318,28 +345,40 @@ function generateLevel(scene, level) {
             fontStyle: 'bold' 
         }).setOrigin(0.5).setScrollFactor(0));
 
-        const startBtn = scene.add.text(centerX, centerY + 20, 'START GAME', {
-            fontSize: '40px',
-            fill: '#0f0',
-            backgroundColor: '#222',
-            padding: { x: 30, y: 15 }
-        }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
-
-        const tutorialBtn = scene.add.text(centerX, centerY + 120, 'TUTORIAL', {
-            fontSize: '40px',
-            fill: '#0ff',
-            backgroundColor: '#222',
-            padding: { x: 30, y: 15 }
+        const startBtn = scene.add.text(centerX, centerY, 'START GAME', { 
+            fontSize: '48px', 
+            fill: '#0f0', 
+            backgroundColor: '#222', 
+            padding: { x: 40, y: 20 } 
         }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
 
         startBtn.on('pointerdown', () => {
-            currentLevel = 1;
-            generateLevel(scene, currentLevel);
+            if (!isTransitioning) {
+                isTransitioning = true;
+                currentLevel = 1;
+                scene.cameras.main.fadeOut(500, 0, 0, 0);
+                scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                    scene.scene.restart();
+                });
+            }
         });
 
+        const tutorialBtn = scene.add.text(centerX, centerY + 120, 'TUTORIAL', { 
+            fontSize: '40px', 
+            fill: '#0ff', 
+            backgroundColor: '#222', 
+            padding: { x: 30, y: 15 } 
+        }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+
         tutorialBtn.on('pointerdown', () => {
-            currentLevel = 0;
-            generateLevel(scene, currentLevel);
+            if (!isTransitioning) {
+                isTransitioning = true;
+                currentLevel = 0;
+                scene.cameras.main.fadeOut(500, 0, 0, 0);
+                scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                    scene.scene.restart();
+                });
+            }
         });
 
         // Hover effects
@@ -362,6 +401,7 @@ function generateLevel(scene, level) {
     } else if (level === 0) {
         // --- TUTORIAL LEVEL ---
         const groundY = 500;
+        // Normal starting platform
         platforms.create(0, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
         tutorialTexts.push(scene.add.text(50, 400, 'A/D to Move\nSPACE to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
 
@@ -372,10 +412,10 @@ function generateLevel(scene, level) {
         const p = powerups.create(1150, 450, 'powerup');
         p.body.setAllowGravity(false);
         p.respawnPos = { x: 1150, y: 450 };
-        tutorialTexts.push(scene.add.text(1050, 350, 'Pick up Wing\nPress W to fly up\n(Respawns in 1 sec)', { fontSize: '18px', fill: '#0ff' }).setDepth(10));
+        tutorialTexts.push(scene.add.text(1050, 350, 'Pick up Wing\nPress W to fly up\n(Respawns in 3 sec)', { fontSize: '18px', fill: '#0ff' }).setDepth(10));
 
         platforms.create(1300, 300, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(1350, 200, 'Dashing does NOT make\nyou invincible!', { fontSize: '18px', fill: '#f88' }).setDepth(10));
+        tutorialTexts.push(scene.add.text(1350, 200, 'Dashing through enemies\nmakes you invincible!\n(But NOT through spikes)', { fontSize: '18px', fill: '#f88' }).setDepth(10));
         traps.create(1400, 276, 'trap').setOrigin(0, 0); // Spikes on platform
 
         platforms.create(1600, 300, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
@@ -408,8 +448,8 @@ function generateLevel(scene, level) {
         
         // AGGRESSIVE DIFFICULTY SCALING
         const levelWidth = 1500 + (level * 500); // Levels get significantly longer
-        const trapChance = 0.35 + (level * 0.04); // More spikes
-        const enemyChance = 0.25 + (level * 0.04); // More robots
+        const trapChance = Math.min(0.9, 0.35 + (level * 0.04)); // Capped at 90%
+        const enemyChance = Math.min(0.8, 0.25 + (level * 0.04)); // Capped at 80%
         
         // Jump limits that scale with level
         const maxJumpUp = Math.min(100, 90 + (level * 0.5)); 
@@ -518,7 +558,7 @@ function generateLevel(scene, level) {
             powerup.destroy();
             hasUpwardPowerup = true;
             player.setTint(0x00ffff);
-            scene.time.delayedCall(1000, () => {
+            scene.time.delayedCall(3000, () => {
                 if (respawnPos) {
                     const newPowerup = powerups.create(respawnPos.x, respawnPos.y, 'powerup');
                     newPowerup.body.setAllowGravity(false);
@@ -547,7 +587,9 @@ function generateLevel(scene, level) {
 }
 
 function die(scene, reason = "GAME OVER") {
-    if (isGameOver) return;
+    if (isGameOver || isTransitioning) return;
+    deathCount += 1;
+    updateDeathDisplay();
     isGameOver = true;
     scene.physics.pause();
     if (player) {
@@ -564,10 +606,20 @@ function die(scene, reason = "GAME OVER") {
     const menuBtn = scene.add.text(centerX, centerY + 140, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
 
     restartBtn.on('pointerdown', () => {
-        if (currentLevel === 0) { isGameOver = false; scene.scene.restart(); }
-        else { currentLevel = 1; isGameOver = false; scene.scene.restart(); }
+        if (!isTransitioning) {
+            isTransitioning = true;
+            if (currentLevel === 0) { isGameOver = false; scene.scene.restart(); }
+            else { currentLevel = 1; isGameOver = false; scene.scene.restart(); }
+        }
     });
-    menuBtn.on('pointerdown', () => { currentLevel = -1; isGameOver = false; scene.scene.restart(); });
+    menuBtn.on('pointerdown', () => {
+        if (!isTransitioning) {
+            isTransitioning = true;
+            currentLevel = -1;
+            isGameOver = false;
+            scene.scene.restart();
+        }
+    });
     restartBtn.on('pointerover', () => restartBtn.setStyle({ fill: '#fff', backgroundColor: '#0a0' }));
     restartBtn.on('pointerout', () => restartBtn.setStyle({ fill: '#0f0', backgroundColor: '#222' }));
     menuBtn.on('pointerover', () => menuBtn.setStyle({ fill: '#fff', backgroundColor: '#088' }));
@@ -575,13 +627,20 @@ function die(scene, reason = "GAME OVER") {
 }
 
 function nextLevel(scene) {
+    if (isTransitioning) return;
+    isTransitioning = true;
+    scene.physics.pause();
+    
     if (currentLevel >= maxLevels) {
-        scene.add.text(500, 300, 'YOU WIN!', { fontSize: '64px', fill: '#0f0' }).setOrigin(0.5).setScrollFactor(0);
-        scene.physics.pause();
+        scene.add.text(scene.scale.width / 2, scene.scale.height / 2, 'Congrats on Beating my Game', { fontSize: '48px', fill: '#0f0', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
         return;
     }
+    
     currentLevel++;
-    generateLevel(scene, currentLevel);
+    scene.cameras.main.fadeOut(500, 0, 0, 0);
+    scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        scene.scene.restart();
+    });
 }
 
 function togglePause(scene) {
@@ -603,7 +662,14 @@ function createPauseMenu(scene) {
     const resumeBtn = scene.add.text(centerX, centerY + 20, 'RESUME', { fontSize: '32px', fill: '#0f0', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(101);
     const menuBtn = scene.add.text(centerX, centerY + 100, 'MAIN MENU', { fontSize: '32px', fill: '#0ff', backgroundColor: '#222', padding: { x: 20, y: 10 } }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(101);
     resumeBtn.on('pointerdown', () => togglePause(scene));
-    menuBtn.on('pointerdown', () => { isPaused = false; currentLevel = -1; scene.scene.restart(); });
+    menuBtn.on('pointerdown', () => {
+        if (!isTransitioning) {
+            isTransitioning = true;
+            isPaused = false;
+            currentLevel = -1;
+            scene.scene.restart();
+        }
+    });
     resumeBtn.on('pointerover', () => resumeBtn.setStyle({ fill: '#fff', backgroundColor: '#0a0' }));
     resumeBtn.on('pointerout', () => resumeBtn.setStyle({ fill: '#0f0', backgroundColor: '#222' }));
     menuBtn.on('pointerover', () => menuBtn.setStyle({ fill: '#fff', backgroundColor: '#088' }));
@@ -619,21 +685,54 @@ function createMobileControls(scene) {
     const size = 70;
     const padding = 40;
     
-    // D-PAD (Left Side)
-    const dpadX = padding + size * 1.5;
-    const dpadY = scene.scale.height - padding - size * 1.5;
+    // Virtual joystick (Left Side)
+    const joystickX = padding + size;
+    const joystickY = scene.scale.height - padding - size;
+    const joystickRadius = size * 0.9;
+    const knobRadius = size * 0.45;
 
-    // Up (W)
-    const upBtn = scene.add.rectangle(dpadX, dpadY - size, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
-    const upText = scene.add.text(dpadX, dpadY - size, 'W', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+    const joystickBase = scene.add.circle(joystickX, joystickY, joystickRadius, 0xaaaaaa, 0.2).setScrollFactor(0).setDepth(100);
+    const joystickKnob = scene.add.circle(joystickX, joystickY, knobRadius, 0xcccccc, 0.6).setScrollFactor(0).setDepth(101).setInteractive();
 
-    // Left (A)
-    const leftBtn = scene.add.rectangle(dpadX - size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
-    const leftText = scene.add.text(dpadX - size, dpadY, '←', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+    let joystickPointerId = null;
 
-    // Right (D)
-    const rightBtn = scene.add.rectangle(dpadX + size, dpadY, size, size, 0xaaaaaa, 0.3).setScrollFactor(0).setInteractive().setDepth(100);
-    const rightText = scene.add.text(dpadX + size, dpadY, '→', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+    const updateJoystick = (pointer) => {
+        const dx = pointer.x - joystickX;
+        const dy = pointer.y - joystickY;
+        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), joystickRadius - knobRadius);
+        const angle = Math.atan2(dy, dx);
+        const nx = joystickX + Math.cos(angle) * dist;
+        const ny = joystickY + Math.sin(angle) * dist;
+        joystickKnob.setPosition(nx, ny);
+
+        // Horizontal movement thresholds
+        touchState.left = dx < -20;
+        touchState.right = dx > 20;
+    };
+
+    const resetJoystick = () => {
+        joystickKnob.setPosition(joystickX, joystickY);
+        touchState.left = false;
+        touchState.right = false;
+        joystickPointerId = null;
+    };
+
+    joystickKnob.on('pointerdown', (pointer) => {
+        joystickPointerId = pointer.id;
+        updateJoystick(pointer);
+    });
+
+    scene.input.on('pointermove', (pointer) => {
+        if (joystickPointerId !== null && pointer.id === joystickPointerId) {
+            updateJoystick(pointer);
+        }
+    });
+
+    scene.input.on('pointerup', (pointer) => {
+        if (pointer.id === joystickPointerId) {
+            resetJoystick();
+        }
+    });
 
     // ACTION BUTTONS (Right Side)
     const jumpX = scene.scale.width - padding - size/2;
@@ -646,6 +745,9 @@ function createMobileControls(scene) {
 
     const dashBtn = scene.add.circle(dashX, dashY, size * 0.5, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(100);
     const dashText = scene.add.text(dashX, dashY, '⚡', { fontSize: '32px' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+    const wingBtn = scene.add.circle(dashX - (size * 1.2), dashY, size * 0.5, 0x00ffff, 0.5).setScrollFactor(0).setInteractive().setDepth(100);
+    const wingText = scene.add.text(dashX - (size * 1.2), dashY, 'W', { fontSize: '24px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // Input events
     leftBtn.on('pointerdown', () => touchState.left = true);
@@ -666,7 +768,15 @@ function createMobileControls(scene) {
     dashBtn.on('pointerdown', () => touchState.dash = true);
     dashBtn.on('pointerup', () => touchState.dash = false);
 
-    mobileControlsUI = [leftBtn, leftText, rightBtn, rightText, upBtn, upText, jumpBtn, jumpText, dashBtn, dashText];
+    wingBtn.on('pointerdown', () => touchState.up = true);
+    wingBtn.on('pointerup', () => touchState.up = false);
+
+    // Mobile Pause Button
+    const pauseBtn = scene.add.circle(scene.scale.width / 2, padding + size / 2, size * 0.4, 0xaaaaaa, 0.4).setScrollFactor(0).setInteractive().setDepth(100);
+    const pauseText = scene.add.text(scene.scale.width / 2, padding + size / 2, '||', { fontSize: '24px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+    pauseBtn.on('pointerdown', () => togglePause(scene));
+
+    mobileControlsUI = [joystickBase, joystickKnob, jumpBtn, jumpText, dashBtn, dashText, wingBtn, wingText, pauseBtn, pauseText];
 }
 
 function refreshTextures(scene, outlineColor) {
@@ -754,6 +864,11 @@ function updateTimerDisplay() {
     timerText.setText(`${minutes}:${seconds < 10 ? '0' : ''}${seconds}`);
     if (timeLeft < 60) timerText.setFill('#f00');
     else timerText.setFill('#fff');
+}
+
+function updateDeathDisplay() {
+    if (!deathText) return;
+    deathText.setText(`Deaths: ${deathCount}`);
 }
 
 function updateBackground(scene, level) {
