@@ -57,6 +57,7 @@ let starfield; // For space levels
 let timeLeft = 600; // 10 minutes in seconds
 let timerEvent; // Added back timerEvent
 let deathCount = 0;
+let isMobile = false;
 let isGameOver = false;
 let isPaused = false;
 let isTransitioning = false; // Prevent multiple level generations
@@ -403,10 +404,16 @@ function generateLevel(scene, level) {
         const groundY = 500;
         // Normal starting platform
         platforms.create(0, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(50, 400, 'A/D to Move\nSPACE to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
+        if (isMobile) {
+            tutorialTexts.push(scene.add.text(50, 400, 'Use Joystick to Move\nTap JUMP to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
+            platforms.create(500, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
+            tutorialTexts.push(scene.add.text(550, 400, 'Tap ⚡ for Dash\nTap W for Wing (if available)', { fontSize: '18px', fill: '#fff' }).setDepth(10));
+        } else {
+            tutorialTexts.push(scene.add.text(50, 400, 'A/D to Move\nSPACE to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
 
-        platforms.create(500, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
-        tutorialTexts.push(scene.add.text(550, 400, 'SHIFT to Dash\n(One use in air)', { fontSize: '18px', fill: '#fff' }).setDepth(10));
+            platforms.create(500, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
+            tutorialTexts.push(scene.add.text(550, 400, 'SHIFT to Dash\n(One use in air)', { fontSize: '18px', fill: '#fff' }).setDepth(10));
+        }
 
         platforms.create(1000, groundY, 'platform').setScale(5, 1).setOrigin(0).refreshBody();
         const p = powerups.create(1150, 450, 'powerup');
@@ -680,6 +687,7 @@ function createPauseMenu(scene) {
 function createMobileControls(scene) {
     // Show on touch devices
     const isTouch = scene.sys.game.device.input.touch;
+    isMobile = !!isTouch;
     if (!isTouch) return;
 
     const size = 70;
