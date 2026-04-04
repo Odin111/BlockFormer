@@ -122,6 +122,7 @@ function create() {
     // Restart functionality
     this.input.keyboard.on('keydown-R', () => {
         if (currentLevel >= 0 && !isTransitioning) {
+            deathCount++; // Count manual restart as a death
             isTransitioning = true;
             if (currentLevel > 0) currentLevel = 1;
             isGameOver = false;
@@ -173,6 +174,7 @@ function create() {
     restartBtnHUD = this.add.text(980, 50, 'RESTART (R)', { fontSize: '18px', fill: '#aaa' }).setOrigin(1, 0).setScrollFactor(0).setInteractive({ useHandCursor: true }).setDepth(100);
     restartBtnHUD.on('pointerdown', () => {
         if (currentLevel >= 0 && !isTransitioning) {
+            deathCount++; // Count manual restart as a death
             isTransitioning = true;
             if (currentLevel > 0) currentLevel = 1;
             isGameOver = false;
@@ -223,6 +225,22 @@ function update(time, delta) {
 
     if (isDashing) {
         player.setTint(0x00ffff); // Dash color
+        
+        // Ghosting trail
+        if (Math.random() > 0.3) {
+            const ghost = this.add.sprite(player.x, player.y, 'player');
+            ghost.setTint(0x00ffff);
+            ghost.setAlpha(0.5);
+            this.tweens.add({
+                targets: ghost,
+                alpha: 0,
+                scale: 0.5,
+                duration: 300,
+                ease: 'Linear',
+                onComplete: () => ghost.destroy()
+            });
+        }
+
         if (time > dashTime + dashDuration) {
             isDashing = false;
             player.body.allowGravity = true;
@@ -261,6 +279,7 @@ function update(time, delta) {
         player.body.allowGravity = false;
         player.setVelocity(0, -dashSpeed);
         if (touchState.up) wingUsedOnTouch = true;
+        createBurstEffect(this, player.x, player.y, 0x00ffff);
     }
 
     // Dash
@@ -269,6 +288,7 @@ function update(time, delta) {
         canDash = false; // Only one use before hitting ground
         dashTime = time;
         player.body.allowGravity = false;
+        createBurstEffect(this, player.x, player.y, 0x00ffff);
 
         // Determine dash direction
         if (keys.left.isDown || touchState.left) {
@@ -896,4 +916,28 @@ function updateBackground(scene, level) {
     bgGraphics.fillRect(0, 0, scene.scale.width, scene.scale.height);
     scene.children.sendToBack(bgGraphics);
     if (starfield) scene.children.sendToBack(starfield.manager);
+}
+
+function createBurstEffect(scene, x, y, color) {
+    for (let i = 0; i < 10; i++) {
+        const particle = scene.add.sprite(x, y, 'powerup'); // Use powerup texture which is a small circle
+        particle.setTint(color);
+        particle.setScale(Math.random() * 0.5 + 0.3);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 100 + 50;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        
+        scene.tweens.add({
+            targets: particle,
+            x: x + vx,
+            y: y + vy,
+            alpha: 0,
+            scale: 0,
+            duration: 400,
+            ease: 'Cubic.easeOut',
+            onComplete: () => particle.destroy()
+        });
+    }
 }
