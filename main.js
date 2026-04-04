@@ -78,7 +78,7 @@ function create() {
 
     isMobile = /Mobi|Android|iP(ad|hone|od)/i.test(navigator.userAgent) || this.sys.game.device.input.touch;
     console.log('isMobile', isMobile, 'touch', this.sys.game.device.input.touch);
-    
+
     isGameOver = false;
     isPaused = false;
     isTransitioning = false; // RESET THIS - Crucial to prevent freezes!
@@ -163,12 +163,12 @@ function create() {
     // Ability Icons
     this.add.text(20, 550, 'Dash:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
     dashIcon = this.add.image(100, 560, 'dashIcon').setScrollFactor(0).setDepth(100);
-    
+
     this.add.text(150, 550, 'Wing:', { fontSize: '18px', fill: '#fff' }).setScrollFactor(0).setDepth(100);
     wingIcon = this.add.image(220, 560, 'powerup').setScale(0.8).setScrollFactor(0).setTint(0x00ffff).setDepth(100);
 
     skipText = this.add.text(500, 570, 'Press K to Skip Tutorial', { fontSize: '18px', fill: '#aaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
-    
+
     // HUD Restart Button
     restartBtnHUD = this.add.text(980, 50, 'RESTART (R)', { fontSize: '18px', fill: '#aaa' }).setOrigin(1, 0).setScrollFactor(0).setInteractive({ useHandCursor: true }).setDepth(100);
     restartBtnHUD.on('pointerdown', () => {
@@ -190,7 +190,7 @@ function create() {
     createMobileControls(this);
 
     generateLevel(this, currentLevel);
-    
+
     if (player) {
         this.cameras.main.startFollow(player, true, 0.1, 0.1);
     }
@@ -269,7 +269,7 @@ function update(time, delta) {
         canDash = false; // Only one use before hitting ground
         dashTime = time;
         player.body.allowGravity = false;
-        
+
         // Determine dash direction
         if (keys.left.isDown || touchState.left) {
             player.setVelocity(-dashSpeed, 0);
@@ -343,17 +343,17 @@ function generateLevel(scene, level) {
         const centerX = scene.scale.width / 2;
         const centerY = scene.scale.height / 2;
 
-        menuUI.push(scene.add.text(centerX, centerY - 150, 'BLOCKFORMER', { 
-            fontSize: '80px', 
-            fill: '#fff', 
-            fontStyle: 'bold' 
+        menuUI.push(scene.add.text(centerX, centerY - 150, 'BLOCKFORMER', {
+            fontSize: '80px',
+            fill: '#fff',
+            fontStyle: 'bold'
         }).setOrigin(0.5).setScrollFactor(0));
 
-        const startBtn = scene.add.text(centerX, centerY, 'START GAME', { 
-            fontSize: '48px', 
-            fill: '#0f0', 
-            backgroundColor: '#222', 
-            padding: { x: 40, y: 20 } 
+        const startBtn = scene.add.text(centerX, centerY, 'START GAME', {
+            fontSize: '48px',
+            fill: '#0f0',
+            backgroundColor: '#222',
+            padding: { x: 40, y: 20 }
         }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
 
         startBtn.on('pointerdown', () => {
@@ -367,11 +367,11 @@ function generateLevel(scene, level) {
             }
         });
 
-        const tutorialBtn = scene.add.text(centerX, centerY + 120, 'TUTORIAL', { 
-            fontSize: '40px', 
-            fill: '#0ff', 
-            backgroundColor: '#222', 
-            padding: { x: 30, y: 15 } 
+        const tutorialBtn = scene.add.text(centerX, centerY + 120, 'TUTORIAL', {
+            fontSize: '40px',
+            fill: '#0ff',
+            backgroundColor: '#222',
+            padding: { x: 30, y: 15 }
         }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
 
         tutorialBtn.on('pointerdown', () => {
@@ -455,24 +455,24 @@ function generateLevel(scene, level) {
         let lastPlatWidth = 4;
         let lastWasHighJump = false; // Added to prevent consecutive high jumps
         platforms.create(lastX, lastY, 'platform').setScale(lastPlatWidth, 1).refreshBody();
-        
+
         // AGGRESSIVE DIFFICULTY SCALING
         const levelWidth = 1500 + (level * 500); // Levels get significantly longer
         const trapChance = Math.min(0.9, 0.35 + (level * 0.04)); // Capped at 90%
         const enemyChance = Math.min(0.8, 0.25 + (level * 0.04)); // Capped at 80%
-        
+
         // Jump limits that scale with level
-        const maxJumpUp = Math.min(100, 90 + (level * 0.5)); 
-        const powerupJumpUp = 180 + (level * 2); 
-        const maxFallDown = 150 + (level * 5); 
-        const minGap = 130 + (level * 3); 
+        const maxJumpUp = Math.min(100, 90 + (level * 0.5));
+        const powerupJumpUp = 180 + (level * 2);
+        const maxFallDown = 150 + (level * 5);
+        const minGap = 130 + (level * 3);
         const maxGap = 250 + (level * 8); // Pushes the limits of Dash usage
 
         while (lastX < levelWidth - 300) {
             // REDUCED PROBABILITY - Reduced chance for High Jumps and prevented consecutive ones
             const isHighJump = !lastWasHighJump && Phaser.Math.Between(0, 10) > (9 - (level / 10));
             let heightChange;
-            
+
             if (isHighJump) {
                 heightChange = Phaser.Math.Between(-powerupJumpUp, -maxJumpUp - 30);
                 lastWasHighJump = true;
@@ -482,27 +482,27 @@ function generateLevel(scene, level) {
             }
 
             let gap = Phaser.Math.Between(minGap, maxGap);
-            
+
             const gapTightness = Math.max(20, 50 - level);
-            if (heightChange < -50) { 
+            if (heightChange < -50) {
                 gap = Phaser.Math.Between(minGap, minGap + gapTightness);
-            } else if (heightChange > 100) { 
+            } else if (heightChange > 100) {
                 gap = Phaser.Math.Between(minGap + gapTightness, maxGap);
             }
-            
+
             // Calculate new position based on gap between platform edges
             // But we use centers for creation, so gap is distance between centers
             const oldX = lastX;
             const oldY = lastY;
             const oldPlatWidth = lastPlatWidth;
-            
+
             lastX += gap;
             lastY = Phaser.Math.Clamp(lastY + heightChange, 100, 550);
-            
+
             lastPlatWidth = 4;
             if (level > 2) lastPlatWidth = Phaser.Math.Between(2, 4);
             if (level > 7) lastPlatWidth = Phaser.Math.Between(1, 3);
-            if (level > 12) lastPlatWidth = Phaser.Math.Between(1, 2); 
+            if (level > 12) lastPlatWidth = Phaser.Math.Between(1, 2);
             if (level > 17) lastPlatWidth = 1;
 
             const p = platforms.create(lastX, lastY, 'platform').setScale(lastPlatWidth, 1).refreshBody();
@@ -513,7 +513,7 @@ function generateLevel(scene, level) {
                 const currLeftEdge = lastX - (lastPlatWidth * 16);
                 const wingX = (prevRightEdge + currLeftEdge) / 2;
                 const wingY = (oldY + lastY) / 2;
-                
+
                 const powerup = powerups.create(wingX, wingY, 'powerup');
                 powerup.body.setAllowGravity(false);
                 powerup.respawnPos = { x: wingX, y: wingY };
@@ -534,12 +534,12 @@ function generateLevel(scene, level) {
 
             if (lastPlatWidth >= 3 && Math.random() < enemyChance) {
                 const enemy = enemies.create(lastX, lastY - 40, 'enemy');
-                
+
                 // Randomize speed: base (100-200) + scaling (level * 10), capped at 400
                 const baseSpeed = Phaser.Math.Between(100, 200);
                 const scalingSpeed = level * 10;
                 const enemySpeed = Math.min(baseSpeed + scalingSpeed, 400);
-                
+
                 enemy.minX = lastX - (lastPlatWidth * 16);
                 enemy.maxX = lastX + (lastPlatWidth * 16);
                 enemy.setVelocityX(Math.random() < 0.5 ? enemySpeed : -enemySpeed);
@@ -562,7 +562,7 @@ function generateLevel(scene, level) {
         scene.physics.add.collider(player, platforms);
         scene.physics.add.collider(enemies, platforms);
         scene.physics.add.collider(enemies, enemies);
-        
+
         scene.physics.add.overlap(player, powerups, (p, powerup) => {
             const respawnPos = powerup.respawnPos;
             powerup.destroy();
@@ -576,7 +576,7 @@ function generateLevel(scene, level) {
                 }
             });
         }, null, scene);
-        
+
         scene.physics.add.overlap(player, traps, (p, t) => die(scene), (p, t) => {
             // Precise triangle hitbox check
             // Points: Bottom-Left, Top-Middle, Bottom-Right
@@ -585,7 +585,7 @@ function generateLevel(scene, level) {
                 t.x + 16, t.y,
                 t.x + 32, t.y + 32
             );
-            
+
             // Use full player bounds for exact accuracy as requested
             return Phaser.Geom.Intersects.RectangleToTriangle(p.getBounds(), triangle);
         }, scene);
@@ -640,12 +640,12 @@ function nextLevel(scene) {
     if (isTransitioning) return;
     isTransitioning = true;
     scene.physics.pause();
-    
+
     if (currentLevel >= maxLevels) {
         scene.add.text(scene.scale.width / 2, scene.scale.height / 2, 'Congrats on Beating my Game', { fontSize: '48px', fill: '#0f0', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
         return;
     }
-    
+
     currentLevel++;
     scene.cameras.main.fadeOut(500, 0, 0, 0);
     scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
@@ -695,7 +695,7 @@ function createMobileControls(scene) {
 
     const size = 70;
     const padding = 40;
-    
+
     // Virtual joystick (Left Side)
     const joystickX = padding + size;
     const joystickY = scene.scale.height - padding - size;
@@ -710,7 +710,7 @@ function createMobileControls(scene) {
     const updateJoystick = (pointer) => {
         const dx = pointer.x - joystickX;
         const dy = pointer.y - joystickY;
-        const dist = Math.min(Math.sqrt(dx*dx + dy*dy), joystickRadius - knobRadius);
+        const dist = Math.min(Math.sqrt(dx * dx + dy * dy), joystickRadius - knobRadius);
         const angle = Math.atan2(dy, dx);
         const nx = joystickX + Math.cos(angle) * dist;
         const ny = joystickY + Math.sin(angle) * dist;
@@ -746,8 +746,8 @@ function createMobileControls(scene) {
     });
 
     // ACTION BUTTONS (Right Side)
-    const jumpX = scene.scale.width - padding - size/2;
-    const jumpY = scene.scale.height - padding - size/2;
+    const jumpX = scene.scale.width - padding - size / 2;
+    const jumpY = scene.scale.height - padding - size / 2;
     const dashX = scene.scale.width - padding - size * 2;
     const dashY = scene.scale.height - padding - size * 2;
 
@@ -761,18 +761,6 @@ function createMobileControls(scene) {
     const wingText = scene.add.text(dashX - (size * 1.2), dashY, 'W', { fontSize: '24px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // Input events
-    leftBtn.on('pointerdown', () => touchState.left = true);
-    leftBtn.on('pointerup', () => touchState.left = false);
-    leftBtn.on('pointerout', () => touchState.left = false);
-
-    rightBtn.on('pointerdown', () => touchState.right = true);
-    rightBtn.on('pointerup', () => touchState.right = false);
-    rightBtn.on('pointerout', () => touchState.right = false);
-
-    upBtn.on('pointerdown', () => touchState.up = true);
-    upBtn.on('pointerup', () => touchState.up = false);
-    upBtn.on('pointerout', () => touchState.up = false);
-
     jumpBtn.on('pointerdown', () => touchState.jump = true);
     jumpBtn.on('pointerup', () => touchState.jump = false);
 
@@ -801,7 +789,7 @@ function refreshTextures(scene, outlineColor) {
     graphics.lineStyle(lineThickness, outlineColor, 1);
     graphics.strokeRect(0, 0, 32, 32);
     graphics.generateTexture('player', 32, 32);
-    
+
     // Platform
     graphics.clear();
     graphics.fillStyle(0x2ecc71, 1);
