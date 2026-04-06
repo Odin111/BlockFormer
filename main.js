@@ -428,7 +428,7 @@ function generateLevel(scene, level) {
         // Normal starting platform
         platforms.create(0, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
         if (isMobile) {
-            tutorialTexts.push(scene.add.text(50, 400, 'Use Joystick to Move\nTap JUMP to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
+            tutorialTexts.push(scene.add.text(50, 400, 'Use D-Pad to Move\nTap JUMP to Jump', { fontSize: '18px', fill: '#fff' }).setDepth(10));
             platforms.create(500, groundY, 'platform').setScale(10, 1).setOrigin(0).refreshBody();
             tutorialTexts.push(scene.add.text(550, 400, 'Tap ⚡ for Dash\nTap W for Wing (if available)', { fontSize: '18px', fill: '#fff' }).setDepth(10));
         } else {
@@ -716,54 +716,50 @@ function createMobileControls(scene) {
     const size = 70;
     const padding = 40;
 
-    // Virtual joystick (Left Side)
-    const joystickX = padding + size;
-    const joystickY = scene.scale.height - padding - size;
-    const joystickRadius = size * 0.9;
-    const knobRadius = size * 0.45;
+    // D-Pad Left/Right (Left Side)
+    const dpadX = padding + size * 1.2;
+    const dpadY = scene.scale.height - padding - size * 0.8;
 
-    const joystickBase = scene.add.circle(joystickX, joystickY, joystickRadius, 0xaaaaaa, 0.2).setScrollFactor(0).setDepth(100);
-    const joystickKnob = scene.add.circle(joystickX, joystickY, knobRadius, 0xcccccc, 0.6).setScrollFactor(0).setDepth(101).setInteractive();
+    // Cross shape of the D-Pad
+    const dpadBgVert = scene.add.rectangle(dpadX, dpadY, size * 0.6, size * 1.8, 0x222222, 0.6).setScrollFactor(0).setDepth(100);
+    const dpadBgHoriz = scene.add.rectangle(dpadX, dpadY, size * 1.8, size * 0.6, 0x222222, 0.6).setScrollFactor(0).setDepth(100);
 
-    let joystickPointerId = null;
+    const leftText = scene.add.text(dpadX - size * 0.6, dpadY, '◀', { fontSize: '32px', fill: '#bbbbbb' }).setOrigin(0.5).setScrollFactor(0).setDepth(102);
+    const rightText = scene.add.text(dpadX + size * 0.6, dpadY, '▶', { fontSize: '32px', fill: '#bbbbbb' }).setOrigin(0.5).setScrollFactor(0).setDepth(102);
 
-    const updateJoystick = (pointer) => {
-        const dx = pointer.x - joystickX;
-        const dy = pointer.y - joystickY;
-        const dist = Math.min(Math.sqrt(dx * dx + dy * dy), joystickRadius - knobRadius);
-        const angle = Math.atan2(dy, dx);
-        const nx = joystickX + Math.cos(angle) * dist;
-        const ny = joystickY + Math.sin(angle) * dist;
-        joystickKnob.setPosition(nx, ny);
+    // Unified interactive zone for sliding
+    const dpadZone = scene.add.rectangle(dpadX, dpadY, size * 2.2, size * 2.2, 0x000000, 0)
+        .setScrollFactor(0).setInteractive().setDepth(101);
 
-        // Horizontal movement thresholds
-        touchState.left = dx < -20;
-        touchState.right = dx > 20;
-    };
-
-    const resetJoystick = () => {
-        joystickKnob.setPosition(joystickX, joystickY);
+    const handleDPadInput = (pointer) => {
+        if (!pointer.isDown) return;
+        const localX = pointer.x - dpadX;
+        
         touchState.left = false;
         touchState.right = false;
-        joystickPointerId = null;
+        leftText.setFill('#bbbbbb');
+        rightText.setFill('#bbbbbb');
+
+        if (localX < -15) {
+            touchState.left = true;
+            leftText.setFill('#ffffff');
+        } else if (localX > 15) {
+            touchState.right = true;
+            rightText.setFill('#ffffff');
+        }
     };
 
-    joystickKnob.on('pointerdown', (pointer) => {
-        joystickPointerId = pointer.id;
-        updateJoystick(pointer);
-    });
+    const resetDPadInput = () => {
+        touchState.left = false;
+        touchState.right = false;
+        leftText.setFill('#bbbbbb');
+        rightText.setFill('#bbbbbb');
+    };
 
-    scene.input.on('pointermove', (pointer) => {
-        if (joystickPointerId !== null && pointer.id === joystickPointerId) {
-            updateJoystick(pointer);
-        }
-    });
-
-    scene.input.on('pointerup', (pointer) => {
-        if (pointer.id === joystickPointerId) {
-            resetJoystick();
-        }
-    });
+    dpadZone.on('pointerdown', handleDPadInput);
+    dpadZone.on('pointermove', handleDPadInput);
+    dpadZone.on('pointerup', resetDPadInput);
+    dpadZone.on('pointerout', resetDPadInput);
 
     // ACTION BUTTONS (Right Side)
     const jumpX = scene.scale.width - padding - size / 2;
@@ -795,7 +791,7 @@ function createMobileControls(scene) {
     const pauseText = scene.add.text(scene.scale.width / 2, padding + size / 2, '||', { fontSize: '24px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
     pauseBtn.on('pointerdown', () => togglePause(scene));
 
-    mobileControlsUI = [joystickBase, joystickKnob, jumpBtn, jumpText, dashBtn, dashText, wingBtn, wingText, pauseBtn, pauseText];
+    mobileControlsUI = [dpadBgVert, dpadBgHoriz, dpadZone, leftText, rightText, jumpBtn, jumpText, dashBtn, dashText, wingBtn, wingText, pauseBtn, pauseText];
 }
 
 function refreshTextures(scene, outlineColor) {
